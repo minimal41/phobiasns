@@ -46,6 +46,7 @@ a{text-decoration:none;color:inherit;}
 .field label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;letter-spacing:.04em;}
 .field input, .field textarea{width:100%;border:1px solid rgba(42,38,32,.18);border-radius:8px;padding:9px 11px;font-family:var(--font-body);font-size:14.5px;color:var(--ink);background:var(--paper-soft);outline:none;}
 .field textarea{resize:none;min-height:60px;}
+.field-hint{font-size:11.5px;color:var(--ink-soft);margin-top:4px;line-height:1.5;}
 .save-row{display:flex;align-items:center;gap:12px;margin-top:6px;}
 .save-note{font-size:12.5px;color:var(--ink-soft);}
 .composer-error{font-size:13px;color:var(--danger);margin-top:8px;min-height:0;font-weight:500;}
@@ -146,7 +147,11 @@ a{text-decoration:none;color:inherit;}
 
     <div class="profile-card">
       <div class="seal" id="profileSealPreview">ゲ</div>
-      <div class="profile-handle" id="profileHandleDisplay">@guest</div>
+      <div class="field">
+        <label>ユーザーID（半角英数字とアンダースコア、3〜15文字）</label>
+        <input type="text" id="profileHandle" maxlength="15" placeholder="ユーザーIDを入力">
+        <div class="field-hint">@から始まる形で投稿に表示されます。他の人が使っているIDには変更できません。</div>
+      </div>
       <div class="field">
         <label>名前</label>
         <input type="text" id="profileName" maxlength="20" placeholder="名前を入力">
@@ -164,7 +169,7 @@ a{text-decoration:none;color:inherit;}
 
     <div class="account-card">
       <h3>アカウント</h3>
-      <p>ユーザーIDは登録時のまま変更できません。ログアウトすると、このデバイスのログイン状態が解除されます。</p>
+      <p>ログアウトすると、このデバイスのログイン状態が解除されます。</p>
       <button class="danger-btn" id="logoutBtn2">ログアウトする</button>
     </div>
 
@@ -176,6 +181,7 @@ a{text-decoration:none;color:inherit;}
 <script>
 (function(){
   const LINK_PATTERN = /(https?:\/\/|www\.|[a-zA-Z0-9-]+\.(com|net|org|jp|co\.jp|io|dev|me|info|xyz|biz|tv|app|ai|gg|to|ly|link))/i;
+  const HANDLE_PATTERN = /^[a-zA-Z0-9_]{3,15}$/;
   const MAX_LEN = 300;
 
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -202,24 +208,34 @@ a{text-decoration:none;color:inherit;}
   function renderProfileForm(){
     document.getElementById('profileName').value = currentProfile.name || '';
     document.getElementById('profileBio').value = currentProfile.bio || '';
+    document.getElementById('profileHandle').value = currentProfile.handle || '';
     document.getElementById('profileSealPreview').textContent = (currentProfile.name||'ゲ').trim()[0] || 'ゲ';
-    document.getElementById('profileHandleDisplay').textContent = '@' + currentProfile.handle;
     document.getElementById('accountHandle').textContent = '@' + currentProfile.handle;
   }
 
   document.getElementById('profileSave').addEventListener('click', async () => {
     const name = document.getElementById('profileName').value.trim();
     const bio = document.getElementById('profileBio').value.trim();
+    const handle = document.getElementById('profileHandle').value.trim().toLowerCase();
     const err = document.getElementById('profileError');
     if(!name){ err.textContent = '名前を入力してください。'; return; }
+    if(!HANDLE_PATTERN.test(handle)){ err.textContent = 'ユーザーIDは半角英数字とアンダースコアで3〜15文字にしてください。'; return; }
     if(containsLink(bio) || containsLink(name)){ err.textContent = 'プロフィールにリンクは使えません。'; return; }
     err.textContent = '';
 
-    const { error } = await supabase.from('profiles').update({ name, bio }).eq('id', currentUser.id);
-    if(error){ err.textContent = '保存に失敗しました: ' + error.message; return; }
+    const { error } = await supabase.from('profiles').update({ name, bio, handle }).eq('id', currentUser.id);
+    if(error){
+      if(error.code === '23505' || error.message.includes('duplicate')){
+        err.textContent = 'このユーザーIDはすでに使われています。別のIDを試してください。';
+      } else {
+        err.textContent = '保存に失敗しました: ' + error.message;
+      }
+      return;
+    }
 
     currentProfile.name = name;
     currentProfile.bio = bio;
+    currentProfile.handle = handle;
     renderProfileForm();
     const note = document.getElementById('profileSavedNote');
     note.textContent = '保存しました';
