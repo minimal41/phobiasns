@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>コトノハ ― 言葉だけの場所</title>
+
+<!-- ▼▼▼ Supabaseライブラリの読み込み（ここは編集不要） ▼▼▼ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap');
+
+:root{
+  --bg:#1B222D;
+  --bg-soft:#222B38;
+  --bg-line:rgba(255,255,255,0.08);
+  --paper:#F5EEDD;
+  --paper-soft:#EEE5CE;
+  --ink:#2A2620;
+  --ink-soft:#726B58;
+  --seal:#A6382B;
+  --seal-dark:#7C2A20;
+  --gold:#C9A227;
+  --danger:#C1453A;
+  --font-display:'Shippori Mincho', serif;
+  --font-body:'Zen Kaku Gothic New', sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--bg);font-family:var(--font-body);color:var(--paper);min-height:100vh;}
+a{text-decoration:none;color:inherit;}
+.app{display:flex;max-width:920px;margin:0 auto;min-height:100vh;align-items:flex-start;}
+
+.sidebar{
+  width:250px;flex-shrink:0;padding:32px 20px;position:sticky;top:0;height:100vh;
+  display:flex;flex-direction:column;gap:28px;border-right:1px solid var(--bg-line);
+}
+.logo{font-family:var(--font-display);font-weight:700;font-size:28px;letter-spacing:.04em;line-height:1.2;}
+.logo small{display:block;font-family:var(--font-body);font-size:11px;font-weight:400;letter-spacing:.12em;color:var(--gold);margin-top:6px;}
+.nav{display:flex;flex-direction:column;gap:4px;}
+.nav-btn{
+  display:flex;align-items:center;gap:12px;background:none;border:none;color:var(--paper);
+  font-family:var(--font-body);font-size:16px;font-weight:500;padding:12px 14px;border-radius:10px;
+  cursor:pointer;text-align:left;transition:background .15s ease;
+}
+.nav-btn svg{width:20px;height:20px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.8;}
+.nav-btn:hover{background:var(--bg-soft);}
+.nav-btn.active{background:var(--bg-soft);color:var(--gold);}
+.post-cta{
+  margin-top:4px;background:var(--seal);color:var(--paper);border:none;border-radius:999px;
+  font-family:var(--font-body);font-weight:700;font-size:15px;padding:13px 0;cursor:pointer;
+  letter-spacing:.06em;transition:background .15s ease;
+}
+.post-cta:hover{background:var(--seal-dark);}
+.account-row{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;color:#B7BECB;padding:0 4px;}
+.rules-card{
+  margin-top:auto;background:var(--bg-soft);border:1px solid var(--bg-line);border-radius:14px;
+  padding:16px 18px;font-size:12.5px;line-height:1.8;color:#B7BECB;
+}
+.rules-card b{display:block;font-family:var(--font-display);font-size:14px;color:var(--gold);margin-bottom:6px;font-weight:700;}
+
+.main{flex:1;min-width:0;border-right:1px solid var(--bg-line);}
+.view-header{
+  padding:18px 24px;border-bottom:1px solid var(--bg-line);font-family:var(--font-display);
+  font-size:19px;font-weight:700;position:sticky;top:0;background:rgba(27,34,45,.9);
+  backdrop-filter:blur(6px);z-index:5;
+}
+
+.composer{padding:20px 24px;border-bottom:1px solid var(--bg-line);}
+.composer-card{background:var(--paper);border-radius:16px;padding:18px 20px 14px;color:var(--ink);}
+.composer textarea{
+  width:100%;border:none;resize:none;background:transparent;font-family:var(--font-body);
+  font-size:16px;line-height:1.7;color:var(--ink);min-height:70px;outline:none;
+}
+.composer textarea::placeholder{color:var(--ink-soft);}
+.composer-foot{display:flex;align-items:center;justify-content:space-between;margin-top:6px;}
+.char-count{font-size:12.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
+.char-count.warn{color:var(--seal);}
+.char-count.over{color:var(--danger);font-weight:700;}
+.composer-error{font-size:13px;color:var(--danger);margin-top:8px;min-height:0;font-weight:500;}
+.submit-btn{
+  background:var(--seal);color:var(--paper);border:none;border-radius:999px;font-family:var(--font-body);
+  font-weight:700;font-size:14px;padding:9px 22px;cursor:pointer;transition:background .15s ease, opacity .15s ease;
+}
+.submit-btn:hover{background:var(--seal-dark);}
+.submit-btn:disabled{opacity:.4;cursor:not-allowed;}
+.submit-btn.ghost{background:transparent;border:1px solid rgba(42,38,32,.25);color:var(--ink);}
+.submit-btn.ghost:hover{background:rgba(42,38,32,.06);}
+.composer-hint{font-size:11.5px;color:#8891A0;margin-top:10px;letter-spacing:.02em;}
+
+.feed-empty{padding:60px 24px;text-align:center;color:#7C8494;font-family:var(--font-display);font-size:15px;line-height:1.9;}
+.post{display:flex;gap:14px;padding:18px 24px;border-bottom:1px solid var(--bg-line);}
+.seal{
+  flex-shrink:0;width:44px;height:44px;border-radius:50%;background:var(--seal);color:var(--paper);
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;
+  font-size:18px;border:2px solid var(--seal-dark);transform:rotate(-4deg);
+  box-shadow:0 0 0 2px rgba(245,238,221,0.06) inset;
+}
+.post-body{flex:1;min-width:0;}
+.post-meta{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.post-name{font-weight:700;font-size:15px;color:var(--paper);}
+.post-handle,.post-time{font-size:13px;color:#8891A0;}
+.post-text{margin-top:4px;font-size:15.5px;line-height:1.75;color:#EDE7D6;white-space:pre-wrap;word-break:break-word;}
+.post-actions{display:flex;gap:22px;margin-top:10px;}
+.action-btn{
+  display:flex;align-items:center;gap:6px;background:none;border:none;color:#8891A0;
+  font-family:var(--font-body);font-size:13.5px;cursor:pointer;padding:4px 2px;transition:color .15s ease;
+}
+.action-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;}
+.action-btn:hover{color:var(--gold);}
+.action-btn.liked{color:var(--seal);}
+.action-btn.liked svg{fill:var(--seal);stroke:var(--seal);}
+.reply-box{margin-top:12px;padding-left:2px;}
+.reply-box textarea{
+  width:100%;background:var(--bg-soft);border:1px solid var(--bg-line);border-radius:10px;color:var(--paper);
+  font-family:var(--font-body);font-size:14px;padding:10px 12px;resize:none;min-height:44px;outline:none;
+}
+.reply-box .composer-error{margin-top:6px;}
+.reply-submit-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+.reply-list{margin-top:12px;display:flex;flex-direction:column;gap:12px;}
+.reply-item{display:flex;gap:10px;}
+.reply-item .seal{width:30px;height:30px;font-size:12px;border-width:1.5px;}
+.reply-item .post-name{font-size:13.5px;}
+.reply-item .post-text{font-size:14px;margin-top:2px;}
+
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;letter-spacing:.04em;}
+.field input, .field textarea{
+  width:100%;border:1px solid rgba(42,38,32,.18);border-radius:8px;padding:9px 11px;
+  font-family:var(--font-body);font-size:14.5px;color:var(--ink);background:var(--paper-soft);outline:none;
+}
+.field textarea{resize:none;min-height:60px;}
+.field-hint{font-size:11.5px;color:var(--ink-soft);margin-top:4px;line-height:1.5;}
+.save-row{display:flex;align-items:center;gap:12px;margin-top:6px;}
+
+.auth-screen{
+  position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);padding:24px;overflow-y:auto;
+}
+.auth-card{width:100%;max-width:420px;background:var(--paper);color:var(--ink);border-radius:18px;padding:34px 30px 28px;margin:auto;}
+.auth-logo{font-family:var(--font-display);font-size:27px;font-weight:700;letter-spacing:.03em;}
+.auth-tagline{font-size:13px;color:var(--ink-soft);margin:6px 0 22px;}
+.auth-tabs{display:flex;gap:6px;margin-bottom:22px;background:var(--paper-soft);border-radius:999px;padding:4px;}
+.auth-tab{
+  flex:1;text-align:center;padding:8px 0;border-radius:999px;font-size:13.5px;font-weight:700;
+  cursor:pointer;color:var(--ink-soft);transition:all .15s ease;
+}
+.auth-tab.active{background:var(--seal);color:var(--paper);}
+.auth-rules{margin-top:20px;padding-top:16px;border-top:1px solid rgba(42,38,32,.12);font-size:12px;color:var(--ink-soft);line-height:1.8;}
+.loading-note{padding:60px 24px;color:#7C8494;font-family:var(--font-display);font-size:15px;}
+
+::selection{background:var(--gold);color:var(--ink);}
+
+@media (max-width: 760px){
+  .app{flex-direction:column;}
+  .sidebar{width:100%;height:auto;position:sticky;flex-direction:row;align-items:center;padding:14px 16px;gap:14px;border-right:none;border-bottom:1px solid var(--bg-line);}
+  .logo{font-size:20px;}
+  .logo small{display:none;}
+  .nav{flex-direction:row;gap:2px;}
+  .nav-btn span{display:none;}
+  .nav-btn{padding:10px;}
+  .post-cta{padding:10px 16px;font-size:0;width:44px;height:44px;border-radius:50%;}
+  .post-cta::after{content:'✒';font-size:18px;}
+  .rules-card{display:none;}
+  .account-row{display:none;}
+  .main{border-right:none;}
+  .composer,.post{padding-left:16px;padding-right:16px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     ▼ ここに Supabase の Project URL と anon key を貼り付けてください ▼
+     取得場所: Supabaseダッシュボード → 左メニュー Settings → API
+     ============================================================ -->
+<script>
+  const SUPABASE_URL = "YOUR_SUPABASE_URL";        // 例: "https://xxxxx.supabase.co"
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"; // "anon public" キー
+</script>
+<!-- ============================================================ -->
+
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">コトノハ</div>
+    <div class="auth-tagline">写真のない、言葉だけの居場所</div>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabRegister">新規登録</div>
+      <div class="auth-tab" id="tabLogin">ログイン</div>
+    </div>
+
+    <!-- 新規登録フォーム -->
+    <div id="registerForm">
+      <div class="field">
+        <label>表示名</label>
+        <input type="text" id="regName" maxlength="20" placeholder="例：山田 太郎">
+      </div>
+      <div class="field">
+        <label>メールアドレス</label>
+        <input type="email" id="regEmail" maxlength="120" placeholder="例：taro@example.com">
+      </div>
+      <div class="field">
+        <label>ユーザーID（@handle・半角英数字とアンダースコア、3〜15文字）</label>
+        <input type="text" id="regHandle" maxlength="15" placeholder="例：taro_yamada">
+      </div>
+      <div class="field">
+        <label>パスワード（6文字以上）</label>
+        <input type="password" id="regPassword" maxlength="72" placeholder="パスワードを入力">
+      </div>
+      <div class="field">
+        <label>ひとこと紹介（任意・文字のみ）</label>
+        <textarea id="regBio" maxlength="120" placeholder="自己紹介を文字だけで書いてください"></textarea>
+      </div>
+      <div class="composer-error" id="regError"></div>
+      <div class="field-hint" id="regInfo"></div>
+      <div class="save-row">
+        <button class="submit-btn" id="regSubmit">登録して始める</button>
+      </div>
+    </div>
+
+    <!-- ログインフォーム -->
+    <div id="loginForm" style="display:none;">
+      <div class="field">
+        <label>メールアドレス</label>
+        <input type="email" id="loginEmail" maxlength="120" placeholder="登録したメールアドレス">
+      </div>
+      <div class="field">
+        <label>パスワード</label>
+        <input type="password" id="loginPassword" maxlength="72" placeholder="パスワードを入力">
+      </div>
+      <div class="composer-error" id="loginError"></div>
+      <div class="save-row">
+        <button class="submit-btn" id="loginSubmit">ログイン</button>
+      </div>
+    </div>
+
+    <div class="auth-rules">
+      写真・画像によるプロフィールや投稿は登録できません。<br>
+      投稿・プロフィールへの他サイトリンクの貼り付けも禁止です。
+    </div>
+  </div>
+</div>
+
+<div class="app" id="mainApp" style="display:none;">
+  <aside class="sidebar">
+    <div class="logo">コトノハ<small>言葉だけの、居場所</small></div>
+    <nav class="nav">
+      <a class="nav-btn active" href="index.html">
+        <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>
+        <span>ホーム</span>
+      </a>
+      <a class="nav-btn" href="profile.html">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9.5c0-1.5 1.2-2.5 3-2.5s3 1 3 2.5-1 2-2 2.4c-.6.3-1 .7-1 1.4"/><circle cx="12" cy="16.6" r=".6" fill="currentColor" stroke="none"/></svg>
+        <span>プロフィール</span>
+      </a>
+    </nav>
+    <button class="post-cta" id="sidebarPostBtn">投稿する</button>
+    <div class="account-row"><span id="accountHandle"></span></div>
+    <div class="rules-card">
+      <b>投稿ルール</b>
+      写真・画像は使えません。<br>
+      プロフィールも投稿も、文字だけです。<br>
+      他サイトへのリンクの貼り付けも禁止です。
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="view-header">ホーム</div>
+    <div class="composer">
+      <div class="composer-card">
+        <textarea id="postInput" placeholder="いま、何を考えている？" maxlength="400"></textarea>
+        <div class="composer-error" id="postError"></div>
+        <div class="composer-foot">
+          <span class="char-count" id="postCount">0 / 300字</span>
+          <button class="submit-btn" id="postSubmit" disabled>投稿する</button>
+        </div>
+      </div>
+      <div class="composer-hint">画像添付やリンクの貼り付けはできません。言葉だけでシェアしてください。</div>
+    </div>
+    <div id="feedList"><div class="loading-note">読み込み中…</div></div>
+  </main>
+</div>
+
+<script>
+(function(){
+  const LINK_PATTERN = /(https?:\/\/|www\.|[a-zA-Z0-9-]+\.(com|net|org|jp|co\.jp|io|dev|me|info|xyz|biz|tv|app|ai|gg|to|ly|link))/i;
+  const HANDLE_PATTERN = /^[a-zA-Z0-9_]{3,15}$/;
+  const MAX_LEN = 300;
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let currentUser = null;   // supabase authのユーザー
+  let currentProfile = null; // profilesテーブルの自分の行
+  const myLikes = new Set();
+
+  function escapeHtml(str){
+    return str.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function relTime(ts){
+    const diff = Math.max(0, Date.now() - new Date(ts).getTime());
+    const m = Math.floor(diff/60000);
+    if(m < 1) return 'たった今';
+    if(m < 60) return m + '分前';
+    const h = Math.floor(m/60);
+    if(h < 24) return h + '時間前';
+    const d = Math.floor(h/24);
+    if(d < 7) return d + '日前';
+    return new Date(ts).toLocaleDateString('ja-JP');
+  }
+  function containsLink(text){ return LINK_PATTERN.test(text); }
+
+  // ---------- 認証タブ切り替え ----------
+  document.getElementById('tabRegister').addEventListener('click', () => {
+    document.getElementById('tabRegister').classList.add('active');
+    document.getElementById('tabLogin').classList.remove('active');
+    document.getElementById('registerForm').style.display = '';
+    document.getElementById('loginForm').style.display = 'none';
+  });
+  document.getElementById('tabLogin').addEventListener('click', () => {
+    document.getElementById('tabLogin').classList.add('active');
+    document.getElementById('tabRegister').classList.remove('active');
+    document.getElementById('loginForm').style.display = '';
+    document.getElementById('registerForm').style.display = 'none';
+  });
+
+  // ---------- 新規登録 ----------
+  document.getElementById('regSubmit').addEventListener('click', async () => {
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const handle = document.getElementById('regHandle').value.trim().toLowerCase();
+    const password = document.getElementById('regPassword').value;
+    const bio = document.getElementById('regBio').value.trim();
+    const err = document.getElementById('regError');
+    const info = document.getElementById('regInfo');
+    err.textContent = '';
+    info.textContent = '';
+
+    if(!name){ err.textContent = '表示名を入力してください。'; return; }
+    if(containsLink(name)){ err.textContent = '表示名にリンクは使えません。'; return; }
+    if(!email || !email.includes('@')){ err.textContent = 'メールアドレスを正しく入力してください。'; return; }
+    if(!HANDLE_PATTERN.test(handle)){ err.textContent = 'ユーザーIDは半角英数字とアンダースコアで3〜15文字にしてください。'; return; }
+    if(!password || password.length < 6){ err.textContent = 'パスワードは6文字以上にしてください。'; return; }
+    if(bio && containsLink(bio)){ err.textContent = '紹介文にリンクは使えません。'; return; }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name, handle, bio },
+        emailRedirectTo: window.location.origin + window.location.pathname
+      }
+    });
+
+    if(error){
+      if(error.message.includes('already registered')){
+        err.textContent = 'このメールアドレスはすでに登録されています。ログインタブからお試しください。';
+      } else {
+        err.textContent = '登録に失敗しました: ' + error.message;
+      }
+      return;
+    }
+    if(!data.session){
+      // メール確認が有効な場合、ここで確認メールが送信されている
+      info.textContent = '確認メールを送信しました。メール内のリンクをクリックすると登録が完了します。';
+      return;
+    }
+    await afterLogin();
+  });
+
+  // ---------- ログイン ----------
+  document.getElementById('loginSubmit').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const err = document.getElementById('loginError');
+    err.textContent = '';
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if(error){
+      if(error.message.includes('Email not confirmed')){
+        err.textContent = 'メールの確認がまだ完了していません。届いたメールのリンクをクリックしてください。';
+      } else {
+        err.textContent = 'メールアドレスまたはパスワードが違います。';
+      }
+      return;
+    }
+    await afterLogin();
+  });
+
+  async function afterLogin(){
+    const { data: { user } } = await supabase.auth.getUser();
+    currentUser = user;
+    const { data: profileRow } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    currentProfile = profileRow;
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = '';
+    document.getElementById('accountHandle').textContent = '@' + currentProfile.handle;
+    await loadFeed();
+  }
+
+  // ---------- フィード ----------
+  function postCardHtml(p){
+    const liked = myLikes.has(p.id);
+    const repliesHtml = (p.replies||[]).map(r => `
+      <div class="reply-item">
+        <div class="seal">${escapeHtml((r.profiles?.name||'ゲスト').trim()[0] || 'ゲ')}</div>
+        <div>
+          <div class="post-meta">
+            <span class="post-name">${escapeHtml(r.profiles?.name||'ゲスト')}</span>
+            <span class="post-time">・${relTime(r.created_at)}</span>
+          </div>
+          <div class="post-text">${escapeHtml(r.text)}</div>
+        </div>
+      </div>
+    `).join('');
+
+    const likeCount = (p.likes||[]).length;
+
+    return `
+    <div class="post" data-id="${p.id}">
+      <div class="seal">${escapeHtml((p.profiles?.name||'ゲスト').trim()[0] || 'ゲ')}</div>
+      <div class="post-body">
+        <div class="post-meta">
+          <span class="post-name">${escapeHtml(p.profiles?.name||'ゲスト')}</span>
+          <span class="post-handle">@${escapeHtml(p.profiles?.handle||'guest')}</span>
+          <span class="post-time">・${relTime(p.created_at)}</span>
+        </div>
+        <div class="post-text">${escapeHtml(p.text)}</div>
+        <div class="post-actions">
+          <button class="action-btn reply-toggle">
+            <svg viewBox="0 0 24 24"><path d="M21 12c0 4-4 7-9 7-1.1 0-2.1-.13-3-.37L4 20l1.5-4.2C4.55 14.6 4 13.35 4 12c0-4 4-7 9-7s9 3 9 7Z"/></svg>
+            ${(p.replies||[]).length}
+          </button>
+          <button class="action-btn like-btn ${liked?'liked':''}">
+            <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.35-9.5-8.5C.8 8.2 2.4 5 5.8 5c1.9 0 3.3 1 4.2 2.4C11 6 12.3 5 14.2 5c3.4 0 5 3.2 3.3 6.5C19 15.65 12 20 12 20Z"/></svg>
+            ${likeCount}
+          </button>
+        </div>
+        <div class="reply-box" style="display:none;">
+          <textarea placeholder="返信を書く（文字だけ）" maxlength="300"></textarea>
+          <div class="composer-error"></div>
+          <div class="reply-submit-row">
+            <span class="char-count">0 / 300字</span>
+            <button class="submit-btn reply-submit">返信する</button>
+          </div>
+        </div>
+        ${repliesHtml ? `<div class="reply-list">${repliesHtml}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  async function loadFeed(){
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        id, text, created_at,
+        profiles ( name, handle ),
+        replies ( id, text, created_at, profiles ( name ) ),
+        likes ( user_id )
+      `)
+      .order('created_at', { ascending: false });
+
+    const list = document.getElementById('feedList');
+    if(error){
+      list.innerHTML = `<div class="feed-empty">読み込みに失敗しました: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    if(!data.length){
+      list.innerHTML = `<div class="feed-empty">まだ投稿がありません。<br>最初の言葉を、ここに残してみましょう。</div>`;
+      return;
+    }
+    myLikes.clear();
+    data.forEach(p => { if((p.likes||[]).some(l => l.user_id === currentUser.id)) myLikes.add(p.id); });
+
+    list.innerHTML = data.map(p => postCardHtml(p)).join('');
+    bindPostEvents(list, data);
+  }
+
+  function bindPostEvents(container, feedData){
+    container.querySelectorAll('.post').forEach(el => {
+      const id = el.dataset.id;
+      const post = feedData.find(p => p.id === id);
+
+      el.querySelector('.reply-toggle').addEventListener('click', () => {
+        const box = el.querySelector('.reply-box');
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+      });
+
+      el.querySelector('.like-btn').addEventListener('click', async () => {
+        if(myLikes.has(id)){
+          myLikes.delete(id);
+          await supabase.from('likes').delete().eq('post_id', id).eq('user_id', currentUser.id);
+        } else {
+          myLikes.add(id);
+          await supabase.from('likes').insert({ post_id: id, user_id: currentUser.id });
+        }
+        await loadFeed();
+      });
+
+      const replyBox = el.querySelector('.reply-box');
+      const replyTextarea = replyBox.querySelector('textarea');
+      const replyCount = replyBox.querySelector('.char-count');
+      const replyError = replyBox.querySelector('.composer-error');
+      const replySubmit = replyBox.querySelector('.reply-submit');
+
+      replyTextarea.addEventListener('input', () => {
+        const len = replyTextarea.value.length;
+        replyCount.textContent = len + ' / 300字';
+        replyCount.className = 'char-count' + (len > MAX_LEN ? ' over' : len > MAX_LEN*0.9 ? ' warn' : '');
+        replyError.textContent = '';
+      });
+
+      replySubmit.addEventListener('click', async () => {
+        const text = replyTextarea.value.trim();
+        if(!text){ replyError.textContent = '本文を入力してください。'; return; }
+        if(text.length > MAX_LEN){ replyError.textContent = `${MAX_LEN}字以内で書いてください。`; return; }
+        if(containsLink(text)){ replyError.textContent = 'リンクは投稿できません。'; return; }
+        const { error } = await supabase.from('replies').insert({ post_id: id, author_id: currentUser.id, text });
+        if(error){ replyError.textContent = '送信に失敗しました: ' + error.message; return; }
+        replyTextarea.value = '';
+        await loadFeed();
+      });
+    });
+  }
+
+  // ---------- 新規投稿 ----------
+  const postInput = document.getElementById('postInput');
+  const postCount = document.getElementById('postCount');
+  const postError = document.getElementById('postError');
+  const postSubmit = document.getElementById('postSubmit');
+
+  postInput.addEventListener('input', () => {
+    const len = postInput.value.length;
+    postCount.textContent = `${len} / ${MAX_LEN}字`;
+    postCount.className = 'char-count' + (len > MAX_LEN ? ' over' : len > MAX_LEN*0.9 ? ' warn' : '');
+    postError.textContent = '';
+    postSubmit.disabled = !(len > 0 && len <= MAX_LEN);
+  });
+
+  postSubmit.addEventListener('click', async () => {
+    const text = postInput.value.trim();
+    if(!text){ postError.textContent = '本文を入力してください。'; return; }
+    if(containsLink(text)){ postError.textContent = 'リンクは投稿できません。'; return; }
+    const { error } = await supabase.from('posts').insert({ author_id: currentUser.id, text });
+    if(error){ postError.textContent = '投稿に失敗しました: ' + error.message; return; }
+    postInput.value = '';
+    postCount.textContent = `0 / ${MAX_LEN}字`;
+    postCount.className = 'char-count';
+    postSubmit.disabled = true;
+    await loadFeed();
+  });
+
+  document.getElementById('sidebarPostBtn').addEventListener('click', () => postInput.focus());
+
+  // ---------- 初期化: すでにログイン中か確認 ----------
+  (async function init(){
+    const { data: { session } } = await supabase.auth.getSession();
+    if(session){
+      await afterLogin();
+    }
+  })();
+})();
+</script>
+</body>
+</html>
