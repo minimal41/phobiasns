@@ -244,8 +244,8 @@ a{text-decoration:none;color:inherit;}
       .from('posts')
       .select(`
         id, text, created_at,
-        profiles ( name, handle ),
-        replies ( id, text, created_at, profiles ( name ) ),
+        profiles!posts_author_id_fkey ( name, handle ),
+        replies ( id, text, created_at, profiles!replies_author_id_fkey ( name ) ),
         likes ( user_id )
       `)
       .eq('author_id', targetProfile.id)
