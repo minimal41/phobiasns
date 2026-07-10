@@ -562,13 +562,20 @@ a{text-decoration:none;color:inherit;}
 
   // ---------- 初期化: すでにログイン中か確認 ----------
   (async function init(){
-    const { data: { session } } = await supabase.auth.getSession();
-    if(session){
-      await afterLogin();
-    } else {
-      document.getElementById('initLoading').style.display = 'none';
-      document.getElementById('authScreen').style.display = 'flex';
+    try{
+      const { data, error } = await supabase.auth.getSession();
+      if(error) throw error;
+      if(data.session){
+        await afterLogin();
+        return;
+      }
+    }catch(e){
+      console.error('セッション確認でエラーが発生しました:', e);
+      // 壊れた/古いログイン情報が残っている可能性があるので念のためクリアする
+      try{ await supabase.auth.signOut(); }catch(e2){ /* 何もしない */ }
     }
+    document.getElementById('initLoading').style.display = 'none';
+    document.getElementById('authScreen').style.display = 'flex';
   })();
 })();
 </script>
