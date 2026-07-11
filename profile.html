@@ -68,6 +68,7 @@ a{text-decoration:none;color:inherit;}
 .action-btn:hover{color:var(--gold);}
 .action-btn.liked{color:var(--seal);}
 .action-btn.liked svg{fill:var(--seal);stroke:var(--seal);}
+.action-btn.delete-btn:hover{color:var(--danger);}
 .reply-box{margin-top:12px;padding-left:2px;}
 .reply-box textarea{width:100%;background:var(--bg-soft);border:1px solid var(--bg-line);border-radius:10px;color:var(--paper);font-family:var(--font-body);font-size:14px;padding:10px 12px;resize:none;min-height:44px;outline:none;}
 .reply-box .composer-error{margin-top:6px;font-size:13px;color:var(--danger);font-weight:500;}
@@ -192,6 +193,7 @@ a{text-decoration:none;color:inherit;}
 
   function postCardHtml(p){
     const liked = myLikes.has(p.id);
+    const isOwner = p.author_id === currentUser.id;
     const repliesHtml = (p.replies||[]).map(r => `
       <div class="reply-item">
         <div class="seal">${escapeHtml((r.profiles?.name||'ゲスト').trim()[0] || 'ゲ')}</div>
@@ -225,6 +227,11 @@ a{text-decoration:none;color:inherit;}
             <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
             ${likeCount}
           </button>
+          ${isOwner ? `
+          <button class="action-btn delete-btn">
+            <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>
+            削除
+          </button>` : ''}
         </div>
         <div class="reply-box" style="display:none;">
           <textarea placeholder="返信を書く（文字だけ）" maxlength="300"></textarea>
@@ -243,7 +250,7 @@ a{text-decoration:none;color:inherit;}
     const { data, error } = await supabase
       .from('posts')
       .select(`
-        id, text, created_at,
+        id, text, created_at, author_id,
         profiles!author_id ( name, handle ),
         replies ( id, text, created_at, profiles!author_id ( name ) ),
         likes ( user_id )
@@ -286,6 +293,16 @@ a{text-decoration:none;color:inherit;}
         }
         await loadPosts();
       });
+
+      const deleteBtn = el.querySelector('.delete-btn');
+      if(deleteBtn){
+        deleteBtn.addEventListener('click', async () => {
+          if(!confirm('この投稿を削除しますか？この操作は取り消せません。')) return;
+          const { error } = await supabase.from('posts').delete().eq('id', id).eq('author_id', currentUser.id);
+          if(error){ alert('削除に失敗しました: ' + error.message); return; }
+          await loadPosts();
+        });
+      }
 
       const replyBox = el.querySelector('.reply-box');
       const replyTextarea = replyBox.querySelector('textarea');
