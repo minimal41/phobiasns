@@ -60,6 +60,8 @@ a{text-decoration:none;color:inherit;}
 .action-btn.liked{color:var(--seal);}
 .action-btn.liked svg{fill:var(--seal);stroke:var(--seal);}
 .action-btn.delete-btn:hover{color:var(--danger);}
+.parent-link{display:block;padding:10px 24px;font-size:13px;color:#8891A0;border-bottom:1px solid var(--bg-line);}
+.parent-link:hover{color:var(--gold);}
 
 .composer{padding:20px 24px;border-bottom:1px solid var(--bg-line);}
 .composer-card{background:var(--paper);border-radius:16px;padding:18px 20px 14px;color:var(--ink);}
@@ -81,12 +83,14 @@ a{text-decoration:none;color:inherit;}
 .submit-btn:disabled{opacity:.4;cursor:not-allowed;}
 
 .reply-section-title{padding:14px 24px 0;font-family:var(--font-display);font-size:14.5px;color:#B7BECB;font-weight:700;}
-.reply-item{display:flex;gap:12px;padding:16px 24px;border-bottom:1px solid var(--bg-line);}
-.reply-item .seal{width:36px;height:36px;font-size:14px;border-width:1.5px;}
-.reply-item .post-meta{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
-.reply-item .post-name{font-weight:700;font-size:14.5px;color:var(--paper);}
-.reply-item .post-time{font-size:12.5px;color:#8891A0;}
-.reply-item .post-text{margin-top:3px;font-size:14.5px;line-height:1.7;color:#EDE7D6;white-space:pre-wrap;word-break:break-word;}
+
+.post{display:flex;gap:14px;padding:18px 24px;border-bottom:1px solid var(--bg-line);cursor:pointer;transition:background .12s ease;}
+.post:hover{background:var(--bg-soft);}
+.post-body{flex:1;min-width:0;}
+.post-meta{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.post-name{font-weight:700;font-size:15px;color:var(--paper);}
+.post-handle,.post-time{font-size:13px;color:#8891A0;}
+.post-text{margin-top:4px;font-size:15.5px;line-height:1.75;color:#EDE7D6;white-space:pre-wrap;word-break:break-word;}
 
 ::selection{background:var(--gold);color:var(--ink);}
 
@@ -101,7 +105,7 @@ a{text-decoration:none;color:inherit;}
   .rules-card{display:none;}
   .account-row{display:none;}
   .main{border-right:none;}
-  .post-detail,.composer,.reply-item,.reply-section-title{padding-left:16px;padding-right:16px;}
+  .post-detail,.composer,.post,.reply-section-title,.parent-link{padding-left:16px;padding-right:16px;}
 }
 </style>
 </head>
@@ -144,6 +148,7 @@ a{text-decoration:none;color:inherit;}
       <a class="back-link" href="index.html">← 戻る</a>
       投稿
     </div>
+    <div id="parentLink"></div>
     <div id="postDetail"><div class="loading-note">読み込み中…</div></div>
     <div class="composer" id="replyComposer" style="display:none;">
       <div class="composer-card">
@@ -169,6 +174,7 @@ a{text-decoration:none;color:inherit;}
   let currentUser = null;
   let currentProfile = null;
   let post = null;
+  const myLikes = new Set();
   const postId = new URLSearchParams(window.location.search).get('id');
 
   function escapeHtml(str){
@@ -190,8 +196,12 @@ a{text-decoration:none;color:inherit;}
   function renderPost(){
     const area = document.getElementById('postDetail');
     const isOwner = post.author_id === currentUser.id;
-    const liked = (post.likes||[]).some(l => l.user_id === currentUser.id);
+    const liked = myLikes.has(post.id);
     const likeCount = (post.likes||[]).length;
+
+    document.getElementById('parentLink').innerHTML = post.parent_id
+      ? `<a class="parent-link" href="post.html?id=${encodeURIComponent(post.parent_id)}">↑ 元の投稿を見る</a>`
+      : '';
 
     area.innerHTML = `
       <div class="post-detail">
@@ -219,12 +229,14 @@ a{text-decoration:none;color:inherit;}
     `;
 
     document.getElementById('likeBtn').addEventListener('click', async () => {
-      if(liked){
+      if(myLikes.has(post.id)){
+        myLikes.delete(post.id);
         post.likes = (post.likes||[]).filter(l => l.user_id !== currentUser.id);
-        await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', currentUser.id);
+        await supabase.from('likes').delete().eq('post_id', post.id).eq('user_id', currentUser.id);
       } else {
+        myLikes.add(post.id);
         post.likes = [...(post.likes||[]), { user_id: currentUser.id }];
-        await supabase.from('likes').insert({ post_id: postId, user_id: currentUser.id });
+        await supabase.from('likes').insert({ post_id: post.id, user_id: currentUser.id });
       }
       renderPost();
     });
@@ -232,45 +244,125 @@ a{text-decoration:none;color:inherit;}
     if(isOwner){
       document.getElementById('deleteBtn').addEventListener('click', async () => {
         if(!confirm('この投稿を削除しますか？この操作は取り消せません。')) return;
-        const { error } = await supabase.from('posts').delete().eq('id', postId).eq('author_id', currentUser.id);
+        const { error } = await supabase.from('posts').delete().eq('id', post.id).eq('author_id', currentUser.id);
         if(error){ alert('削除に失敗しました: ' + error.message); return; }
-        window.location.href = 'index.html';
+        window.location.href = post.parent_id ? ('post.html?id=' + encodeURIComponent(post.parent_id)) : 'index.html';
       });
     }
   }
 
-  function replyItemHtml(r){
+  // ---------- 返信一覧(通常の投稿と同じカードで表示) ----------
+  function replyCardHtml(r){
+    const liked = myLikes.has(r.id);
+    const isOwner = r.author_id === currentUser.id;
+    const likeCount = (r.likes||[]).length;
     return `
-    <div class="reply-item">
+    <div class="post" data-id="${r.id}">
       <div class="seal">${escapeHtml((r.profiles?.name||'ゲスト').trim()[0] || 'ゲ')}</div>
-      <div>
+      <div class="post-body">
         <div class="post-meta">
           <span class="post-name">${escapeHtml(r.profiles?.name||'ゲスト')}</span>
+          <span class="post-handle">@${escapeHtml(r.profiles?.handle||'guest')}</span>
           <span class="post-time">・${relTime(r.created_at)}</span>
         </div>
         <div class="post-text">${escapeHtml(r.text)}</div>
+        <div class="post-actions">
+          <button class="action-btn reply-toggle">
+            <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            ${r.replyCount||0}
+          </button>
+          <button class="action-btn like-btn ${liked?'liked':''}">
+            <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            ${likeCount}
+          </button>
+          ${isOwner ? `
+          <button class="action-btn delete-btn">
+            <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>
+            削除
+          </button>` : ''}
+        </div>
       </div>
     </div>`;
   }
 
-  function renderReplies(){
+  async function attachReplyCounts(posts){
+    if(!posts.length) return;
+    const { data } = await supabase
+      .from('posts')
+      .select('parent_id')
+      .in('parent_id', posts.map(p => p.id));
+    const counts = {};
+    (data||[]).forEach(r => { counts[r.parent_id] = (counts[r.parent_id]||0) + 1; });
+    posts.forEach(p => { p.replyCount = counts[p.id] || 0; });
+  }
+
+  function bindReplyEvents(container){
+    container.querySelectorAll('.post').forEach(el => {
+      const id = el.dataset.id;
+
+      el.addEventListener('click', (e) => {
+        if(e.target.closest('.like-btn') || e.target.closest('.delete-btn')) return;
+        window.location.href = 'post.html?id=' + encodeURIComponent(id);
+      });
+
+      el.querySelector('.like-btn').addEventListener('click', async () => {
+        if(myLikes.has(id)){
+          myLikes.delete(id);
+          await supabase.from('likes').delete().eq('post_id', id).eq('user_id', currentUser.id);
+        } else {
+          myLikes.add(id);
+          await supabase.from('likes').insert({ post_id: id, user_id: currentUser.id });
+        }
+        await loadReplies();
+      });
+
+      const deleteBtn = el.querySelector('.delete-btn');
+      if(deleteBtn){
+        deleteBtn.addEventListener('click', async () => {
+          if(!confirm('この投稿を削除しますか？この操作は取り消せません。')) return;
+          const { error } = await supabase.from('posts').delete().eq('id', id).eq('author_id', currentUser.id);
+          if(error){ alert('削除に失敗しました: ' + error.message); return; }
+          await loadReplies();
+        });
+      }
+    });
+  }
+
+  async function loadReplies(){
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        id, text, created_at, author_id,
+        profiles!author_id ( name, handle ),
+        likes ( user_id )
+      `)
+      .eq('parent_id', postId)
+      .order('created_at', { ascending: true });
+
     const list = document.getElementById('replyList');
-    const replies = (post.replies||[]).slice().sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-    document.getElementById('replySectionTitle').style.display = replies.length ? '' : 'none';
-    if(!replies.length){
+    if(error){
+      list.innerHTML = `<div class="feed-empty">読み込みに失敗しました: ${escapeHtml(error.message)}</div>`;
+      document.getElementById('replySectionTitle').style.display = 'none';
+      return;
+    }
+    document.getElementById('replySectionTitle').style.display = data.length ? '' : 'none';
+    if(!data.length){
       list.innerHTML = `<div class="feed-empty">まだ返信がありません。</div>`;
       return;
     }
-    list.innerHTML = replies.map(replyItemHtml).join('');
+    data.forEach(r => { if((r.likes||[]).some(l => l.user_id === currentUser.id)) myLikes.add(r.id); });
+    await attachReplyCounts(data);
+
+    list.innerHTML = data.map(replyCardHtml).join('');
+    bindReplyEvents(list);
   }
 
   async function loadPost(){
     const { data, error } = await supabase
       .from('posts')
       .select(`
-        id, text, created_at, author_id,
+        id, text, created_at, author_id, parent_id,
         profiles!author_id ( name, handle ),
-        replies ( id, text, created_at, profiles!author_id ( name ) ),
         likes ( user_id )
       `)
       .eq('id', postId)
@@ -279,12 +371,15 @@ a{text-decoration:none;color:inherit;}
     if(error || !data){
       document.getElementById('postDetail').innerHTML = `<div class="feed-empty">投稿が見つかりませんでした。<br>削除されたか、URLが間違っている可能性があります。</div>`;
       document.getElementById('replyComposer').style.display = 'none';
+      document.getElementById('replySectionTitle').style.display = 'none';
       return;
     }
     post = data;
+    myLikes.clear();
+    if((post.likes||[]).some(l => l.user_id === currentUser.id)) myLikes.add(post.id);
     renderPost();
     document.getElementById('replyComposer').style.display = '';
-    renderReplies();
+    await loadReplies();
   }
 
   // ---------- 返信フォーム ----------
@@ -305,13 +400,13 @@ a{text-decoration:none;color:inherit;}
     const text = replyInput.value.trim();
     if(!text){ replyError.textContent = '本文を入力してください。'; return; }
     if(containsLink(text)){ replyError.textContent = 'リンクは投稿できません。'; return; }
-    const { error } = await supabase.from('replies').insert({ post_id: postId, author_id: currentUser.id, text });
+    const { error } = await supabase.from('posts').insert({ parent_id: postId, author_id: currentUser.id, text });
     if(error){ replyError.textContent = '送信に失敗しました: ' + error.message; return; }
     replyInput.value = '';
     replyCount.textContent = `0 / ${MAX_LEN}字`;
     replyCount.className = 'char-count';
     replySubmit.disabled = true;
-    await loadPost();
+    await loadReplies();
   });
 
   // ---------- 初期化 ----------
