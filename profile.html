@@ -56,8 +56,9 @@ a{text-decoration:none;color:inherit;}
   flex-shrink:0;width:44px;height:44px;border-radius:50%;background:var(--seal);color:var(--paper);
   display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;
   font-size:18px;border:2px solid var(--seal-dark);transform:rotate(-4deg);
-  box-shadow:0 0 0 2px rgba(88,118,129,0.06) inset;
+  box-shadow:0 0 0 2px rgba(22,34,74,0.08) inset;transition:opacity .15s ease;
 }
+.seal:hover{opacity:.82;}
 .post-body{flex:1;min-width:0;}
 .post-meta{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
 .post-name{font-weight:700;font-size:15px;color:var(--paper);}
@@ -181,7 +182,7 @@ a{text-decoration:none;color:inherit;}
 
     return `
     <div class="post" data-id="${p.id}">
-      <div class="seal">${escapeHtml((p.profiles?.name||'ゲスト').trim()[0] || 'ゲ')}</div>
+      <a class="seal" href="profile.html?handle=${encodeURIComponent(p.profiles?.handle||'guest')}">${escapeHtml((p.profiles?.name||'ゲスト').trim()[0] || 'ゲ')}</a>
       <div class="post-body">
         <div class="post-meta">
           <a class="post-name" href="profile.html?handle=${encodeURIComponent(p.profiles?.handle||'guest')}">${escapeHtml(p.profiles?.name||'ゲスト')}</a>
@@ -253,7 +254,7 @@ a{text-decoration:none;color:inherit;}
       const id = el.dataset.id;
 
       el.addEventListener('click', (e) => {
-        if(e.target.closest('.like-btn') || e.target.closest('.delete-btn') || e.target.closest('.post-name') || e.target.closest('.post-handle')) return;
+        if(e.target.closest('.like-btn') || e.target.closest('.delete-btn') || e.target.closest('.post-name') || e.target.closest('.post-handle') || e.target.closest('.seal')) return;
         window.location.href = 'post.html?id=' + encodeURIComponent(id);
       });
 

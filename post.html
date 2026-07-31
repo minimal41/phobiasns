@@ -44,8 +44,9 @@ a{text-decoration:none;color:inherit;}
   flex-shrink:0;width:44px;height:44px;border-radius:50%;background:var(--seal);color:var(--paper);
   display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;
   font-size:18px;border:2px solid var(--seal-dark);transform:rotate(-4deg);
-  box-shadow:0 0 0 2px rgba(88,118,129,0.06) inset;
+  box-shadow:0 0 0 2px rgba(22,34,74,0.08) inset;transition:opacity .15s ease;
 }
+.seal:hover{opacity:.82;}
 .post-detail-name{display:block;font-weight:700;font-size:16px;color:var(--paper);}
 .post-detail-name:hover{text-decoration:underline;}
 .post-detail-handle{display:block;font-size:13.5px;color:#181D38;margin-top:2px;}
@@ -209,7 +210,7 @@ a{text-decoration:none;color:inherit;}
     area.innerHTML = `
       <div class="post-detail">
         <div class="post-detail-top">
-          <div class="seal">${escapeHtml((post.profiles?.name||'ゲスト').trim()[0] || 'ゲ')}</div>
+          <a class="seal" href="profile.html?handle=${encodeURIComponent(post.profiles?.handle||'guest')}">${escapeHtml((post.profiles?.name||'ゲスト').trim()[0] || 'ゲ')}</a>
           <div>
             <a class="post-detail-name" href="profile.html?handle=${encodeURIComponent(post.profiles?.handle||'guest')}">${escapeHtml(post.profiles?.name||'ゲスト')}</a>
             <a class="post-detail-handle" href="profile.html?handle=${encodeURIComponent(post.profiles?.handle||'guest')}">@${escapeHtml(post.profiles?.handle||'guest')}</a>
@@ -261,7 +262,7 @@ a{text-decoration:none;color:inherit;}
     const likeCount = (r.likes||[]).length;
     return `
     <div class="post" data-id="${r.id}">
-      <div class="seal">${escapeHtml((r.profiles?.name||'ゲスト').trim()[0] || 'ゲ')}</div>
+      <a class="seal" href="profile.html?handle=${encodeURIComponent(r.profiles?.handle||'guest')}">${escapeHtml((r.profiles?.name||'ゲスト').trim()[0] || 'ゲ')}</a>
       <div class="post-body">
         <div class="post-meta">
           <a class="post-name" href="profile.html?handle=${encodeURIComponent(r.profiles?.handle||'guest')}">${escapeHtml(r.profiles?.name||'ゲスト')}</a>
@@ -304,7 +305,7 @@ a{text-decoration:none;color:inherit;}
       const id = el.dataset.id;
 
       el.addEventListener('click', (e) => {
-        if(e.target.closest('.like-btn') || e.target.closest('.delete-btn') || e.target.closest('.post-name') || e.target.closest('.post-handle')) return;
+        if(e.target.closest('.like-btn') || e.target.closest('.delete-btn') || e.target.closest('.post-name') || e.target.closest('.post-handle') || e.target.closest('.seal')) return;
         window.location.href = 'post.html?id=' + encodeURIComponent(id);
       });
 
