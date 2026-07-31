@@ -103,6 +103,7 @@ a{text-decoration:none;color:inherit;}
 .post-body{flex:1;min-width:0;}
 .post-meta{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
 .post-name{font-weight:700;font-size:15px;color:var(--paper);}
+.post-name:hover,.post-handle:hover{text-decoration:underline;}
 .post-handle,.post-time{font-size:13px;color:#181D38;}
 .post-text{margin-top:4px;font-size:15.5px;line-height:1.75;color:var(--paper);white-space:pre-wrap;word-break:break-word;}
 .post-actions{display:flex;gap:22px;margin-top:10px;}
@@ -408,8 +409,8 @@ a{text-decoration:none;color:inherit;}
       <div class="seal">${escapeHtml((p.profiles?.name||'ゲスト').trim()[0] || 'ゲ')}</div>
       <div class="post-body">
         <div class="post-meta">
-          <span class="post-name">${escapeHtml(p.profiles?.name||'ゲスト')}</span>
-          <span class="post-handle">@${escapeHtml(p.profiles?.handle||'guest')}</span>
+          <a class="post-name" href="profile.html?handle=${encodeURIComponent(p.profiles?.handle||'guest')}">${escapeHtml(p.profiles?.name||'ゲスト')}</a>
+          <a class="post-handle" href="profile.html?handle=${encodeURIComponent(p.profiles?.handle||'guest')}">@${escapeHtml(p.profiles?.handle||'guest')}</a>
           <span class="post-time">・${relTime(p.created_at)}</span>
         </div>
         <div class="post-text">${escapeHtml(p.text)}</div>
@@ -476,7 +477,7 @@ a{text-decoration:none;color:inherit;}
       const id = el.dataset.id;
 
       el.addEventListener('click', (e) => {
-        if(e.target.closest('.like-btn') || e.target.closest('.delete-btn')) return;
+        if(e.target.closest('.like-btn') || e.target.closest('.delete-btn') || e.target.closest('.post-name') || e.target.closest('.post-handle')) return;
         window.location.href = 'post.html?id=' + encodeURIComponent(id);
       });
 
